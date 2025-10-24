@@ -70,7 +70,7 @@
 - Autostart: Can be added later (user‑level service).
 
 ## Networking (Dictation Service)
-- Endpoint: HTTP POST on 0.0.0.0:5123 (LAN accessible).
+- Endpoint: HTTP POST on 127.0.0.1:5123 (LAN accessible).
 - Payload: Single WAV (16 kHz, mono, 16‑bit). Returns JSON with final transcript.
 - Security: No auth/TLS in MVP (private LAN assumed).
 
