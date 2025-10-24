@@ -8,10 +8,11 @@
 ## Activation & State
 - Wake word: “Quasar” (voice activation). Goes from Asleep → Awake.
 - Sleep word: “Dormant” (recognized only while Awake).
-- Auto‑sleep: After 5 minutes without recognized speech (commands or dictation).
-- Indicator: Small overlay, top‑right of screen.
+- Auto‑sleep: After 5 minutes without recognized speech (commands or dictation). Only recognized commands or dictation reset the timer (wake word alone does not).
+- Indicator: Small overlay, top-right of screen.
   - Awake = green
-  - Asleep = red
+  - Asleep = gray
+  - Error = red
 
 ## Microphone & Audio
 - Input: Default system microphone.
@@ -53,7 +54,7 @@
   - If you say “comma/period”, the model may produce punctuation; app does not override.
 
 ## Undo
-- “scratch that”: Deletes the last insertion produced by this app within ~5 seconds. Repeatable to stack within that window. Does not revert navigation/chords.
+- “scratch that”: Deletes the last insertion produced by this app within ~5 seconds. Tracks only the most recent insertion (not repeatable). Does not revert navigation/chords.
 
 ## Key Injection
 - Wayland: Uses virtual keyboard protocol to type into the currently focused field.
@@ -76,4 +77,3 @@
 ## Privacy & Logging
 - No audio is saved. Minimal text logs only.
 - Debug logging can be enabled later if needed.
-
