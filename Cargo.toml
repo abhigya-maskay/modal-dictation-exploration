@@ -10,3 +10,8 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 dirs = "5.0"
 thiserror = "1.0"
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros", "sync", "signal", "fs", "time"] }
+notify = "6.0"
+
+[dev-dependencies]
+tempfile = "3.0"

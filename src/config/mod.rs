@@ -1,5 +1,8 @@
 use std::path::PathBuf;
 
+mod manager;
+pub use manager::ConfigManager;
+
 /// Configuration error types
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -134,6 +137,34 @@ impl DictationServiceConfig {
 }
 
 impl Config {
+    /// Load configuration from a specific path
+    ///
+    /// Falls back to defaults if the file doesn't exist or cannot be parsed.
+    /// Logs errors but does not crash the application.
+    pub fn load_from_path(config_path: PathBuf) -> Self {
+        if !config_path.exists() {
+            tracing::info!("Config file not found at {}, using defaults", config_path.display());
+            return Self::default();
+        }
+
+        match std::fs::read_to_string(&config_path) {
+            Ok(contents) => match toml::from_str::<Config>(&contents) {
+                Ok(config) => {
+                    tracing::info!("Successfully loaded config from {}", config_path.display());
+                    config
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to parse config: {}, using defaults", e);
+                    Self::default()
+                }
+            },
+            Err(e) => {
+                tracing::warn!("Failed to read config file: {}, using defaults", e);
+                Self::default()
+            }
+        }
+    }
+
     /// Load configuration from ~/.config/phonesc/config.toml
     ///
     /// Falls back to defaults if the file doesn't exist or cannot be parsed.
@@ -148,34 +179,7 @@ impl Config {
         };
 
         tracing::debug!("Looking for config at: {}", config_path.display());
-
-        if !config_path.exists() {
-            tracing::info!("Config file not found, using defaults");
-            return Self::default();
-        }
-
-        match std::fs::read_to_string(&config_path) {
-            Ok(contents) => match toml::from_str::<Config>(&contents) {
-                Ok(config) => {
-                    tracing::info!("Successfully loaded config from {}", config_path.display());
-                    config
-                }
-                Err(e) => {
-                    tracing::error!(
-                        "Failed to parse config: {}, falling back to defaults",
-                        e
-                    );
-                    Self::default()
-                }
-            },
-            Err(e) => {
-                tracing::error!(
-                    "Failed to read config file: {}, falling back to defaults",
-                    e
-                );
-                Self::default()
-            }
-        }
+        Self::load_from_path(config_path)
     }
 
     /// Returns the expected path to the config file
