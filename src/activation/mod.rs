@@ -31,7 +31,7 @@ pub struct ActivationManager {
     /// Shared state for the background timer task
     inner: Arc<ManagerInner>,
     /// Handle to the background timer task
-    _timer_task: JoinHandle<()>,
+    timer_task: JoinHandle<()>,
 }
 
 /// Internal state managed by the manager
@@ -76,7 +76,7 @@ impl ActivationManager {
         Self {
             state_tx,
             inner,
-            _timer_task: timer_task,
+            timer_task,
         }
     }
 
@@ -97,7 +97,6 @@ impl ActivationManager {
         let secs = timeout.as_secs();
         self.inner.timeout_secs.store(secs, Ordering::Release);
         tracing::debug!("Updated auto-sleep timeout to: {:?}", timeout);
-        // Notify the timer task to restart with the new timeout
         self.inner.timeout_changed.notify_one();
     }
 
@@ -238,6 +237,12 @@ impl ActivationManager {
                 }
             }
         })
+    }
+}
+
+impl Drop for ActivationManager {
+    fn drop(&mut self) {
+        self.timer_task.abort();
     }
 }
 

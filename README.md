@@ -156,6 +156,50 @@ INFO phonesc: Config updated!
 - The config directory is watched (not just the file) to handle atomic writes from editors like vim and nano
 - All subscribers receive updates simultaneously through an efficient broadcast channel
 
+## Overlay Indicator
+
+Phonesc displays a small 32x32px circular indicator in the top-right corner of your screen that shows the current system state:
+
+### States
+
+- **Green (Awake)**: The system is active and listening for commands/dictation
+- **Gray (Asleep)**: The system is sleeping and only listening for the wake word
+- **Red (Error)**: An error occurred (e.g., Wayland compositor disconnected). The system will attempt to recover automatically
+
+### Configuration
+
+Customize the overlay appearance in `~/.config/phonesc/config.toml`:
+
+```toml
+[overlay]
+# Colors for each state (supports named colors and hex codes)
+awake_color = "green"      # or "#00FF00"
+asleep_color = "gray"      # or "#808080"
+error_color = "red"        # or "#FF0000"
+
+# Position: top-right, top-left, bottom-right, bottom-left
+position = "top-right"
+```
+
+### Supported Color Names
+
+Named colors: `green`, `lime`, `gray`, `grey`, `red`, `blue`, `yellow`, `cyan`, `magenta`, `white`, `black`, `orange`, `purple`, `pink`
+
+Hex colors: `#RRGGBB` or `#RRGGBBAA` (with alpha channel)
+
+### Real-time Updates
+
+Changes to overlay configuration take effect immediately when you save the config file—no restart required! Edit colors or position and watch the indicator update in real-time.
+
+### Error Recovery
+
+If the Wayland compositor disconnects (e.g., when switching to a different TTY or desktop environment), the overlay will:
+
+1. Display a red indicator
+2. Log a warning message
+3. Attempt to reconnect using exponential backoff (1s, 2s, 4s, 8s, 16s, 30s max)
+4. Resume normal operation once reconnected
+
 ## License
 
 TBD

@@ -14,7 +14,7 @@ pub struct ConfigManager {
     /// Receiver that can be cloned for subscribers
     rx: watch::Receiver<Arc<Config>>,
     /// Handle to the file watcher task
-    _watcher_task: JoinHandle<()>,
+    watcher_task: JoinHandle<()>,
 }
 
 impl ConfigManager {
@@ -24,7 +24,6 @@ impl ConfigManager {
         Self::new_internal(config_dir)
     }
 
-    /// Creates a ConfigManager with a custom config directory path (for testing)
     #[cfg(test)]
     pub fn new_with_path(config_dir: PathBuf) -> Result<Self, ConfigError> {
         Self::new_internal(config_dir)
@@ -46,7 +45,7 @@ impl ConfigManager {
         Ok(Self {
             tx,
             rx,
-            _watcher_task: watcher_task,
+            watcher_task,
         })
     }
 
@@ -174,6 +173,12 @@ impl ConfigManager {
             .join("phonesc");
 
         Ok(config_dir)
+    }
+}
+
+impl Drop for ConfigManager {
+    fn drop(&mut self) {
+        self.watcher_task.abort();
     }
 }
 

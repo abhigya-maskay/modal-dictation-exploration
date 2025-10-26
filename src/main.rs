@@ -1,9 +1,11 @@
 mod activation;
 mod config;
+mod overlay;
 
 use std::sync::Arc;
 use activation::ActivationManager;
 use config::ConfigManager;
+use overlay::OverlayManager;
 
 #[tokio::main]
 async fn main() {
@@ -26,6 +28,9 @@ async fn main() {
 
     let activation = Arc::new(ActivationManager::new(config.auto_sleep_timeout_secs));
     tracing::info!("ActivationManager initialized");
+
+    let _overlay = OverlayManager::new_with_wayland(&manager, &activation);
+    tracing::info!("OverlayManager initialized and running");
 
     println!("phonesc starting with config:");
     println!("  Auto-sleep timeout: {}s", config.auto_sleep_timeout_secs);
