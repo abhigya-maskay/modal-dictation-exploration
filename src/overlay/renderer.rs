@@ -32,7 +32,7 @@ impl OverlayColor {
     }
 
     /// Creates a fully opaque color
-    pub fn opaque(r: u8, g: u8, b: u8) -> Self {
+    pub const fn opaque(r: u8, g: u8, b: u8) -> Self {
         Self { r, g, b, a: 255 }
     }
 
@@ -89,10 +89,10 @@ pub fn parse_color_with_fallback(color_str: &str, fallback: OverlayColor) -> Ove
 /// Parses a named color string
 fn parse_named_color(name: &str) -> Option<OverlayColor> {
     match name {
-        "green" => Some(OverlayColor::opaque(0, 255, 0)),
+        "green" => Some(crate::overlay::DEFAULT_AWAKE_COLOR),
         "lime" => Some(OverlayColor::opaque(0, 255, 0)),
-        "gray" | "grey" => Some(OverlayColor::opaque(128, 128, 128)),
-        "red" => Some(OverlayColor::opaque(255, 0, 0)),
+        "gray" | "grey" => Some(crate::overlay::DEFAULT_ASLEEP_COLOR),
+        "red" => Some(crate::overlay::DEFAULT_ERROR_COLOR),
         "blue" => Some(OverlayColor::opaque(0, 0, 255)),
         "yellow" => Some(OverlayColor::opaque(255, 255, 0)),
         "cyan" => Some(OverlayColor::opaque(0, 255, 255)),
@@ -258,7 +258,7 @@ mod tests {
     fn test_invalid_color_returns_error() {
         assert!(parse_color("invalid123").is_err());
         assert!(parse_color("#GGGGGG").is_err());
-        assert!(parse_color("#00FF0").is_err()); // 5 digits
+        assert!(parse_color("#00FF0").is_err());
         assert!(parse_color("notacolor").is_err());
     }
 
@@ -321,9 +321,25 @@ mod tests {
 
     #[test]
     fn test_overlay_color_to_skia_conversion() {
-        let color = OverlayColor::opaque(255, 128, 64);
-        let skia_color = color.to_skia_color();
-        assert!(skia_color.is_opaque() || !skia_color.is_opaque());
+        let opaque_color = OverlayColor::opaque(255, 128, 64);
+        let skia_color = opaque_color.to_skia_color();
+
+        assert!(skia_color.is_opaque(), "Color with alpha=255 should be opaque");
+
+        assert_eq!(skia_color.red(), 1.0, "Red component 255/255 should equal 1.0");
+        assert!((skia_color.green() - (128.0 / 255.0)).abs() < 0.001, "Green component 128/255 should be ~0.502");
+        assert!((skia_color.blue() - (64.0 / 255.0)).abs() < 0.001, "Blue component 64/255 should be ~0.251");
+        assert_eq!(skia_color.alpha(), 1.0, "Alpha component 255/255 should equal 1.0");
+    }
+
+    #[test]
+    fn test_overlay_color_to_skia_conversion_transparent() {
+        let transparent_color = OverlayColor::new(200, 100, 50, 128);
+        let skia_color = transparent_color.to_skia_color();
+
+        assert!(!skia_color.is_opaque(), "Color with alpha=128 should not be opaque");
+
+        assert!((skia_color.alpha() - (128.0 / 255.0)).abs() < 0.001, "Alpha component 128/255 should be ~0.502");
     }
 
     #[test]

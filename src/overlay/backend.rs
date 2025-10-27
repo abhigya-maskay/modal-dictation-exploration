@@ -40,6 +40,11 @@ impl MockOverlayBackend {
             last_color: None,
         })
     }
+
+    /// Get the last color that was updated
+    pub fn last_color(&self) -> Option<OverlayColor> {
+        self.last_color
+    }
 }
 
 /// Mock overlay backend that can be configured to fail in specific ways
@@ -153,12 +158,12 @@ impl OverlayBackend for FailingMockBackend {
         *attempts += 1;
         drop(attempts);
 
-        let position = self.position;
         Box::pin(async move {
-            tracing::debug!("FailingMockBackend connecting (position: {:?})", position);
+            tracing::debug!("FailingMockBackend connecting (position: {:?})", self.position);
             if should_fail {
                 Err(WaylandError::ConnectionFailed)
             } else {
+                self.connected = true;
                 Ok(())
             }
         })
@@ -179,22 +184,24 @@ impl OverlayBackend for FailingMockBackend {
         *attempts += 1;
         drop(attempts);
 
-        let position = self.position;
         Box::pin(async move {
             tracing::debug!(
                 "FailingMockBackend color update (position: {:?}, color: {:?})",
-                position,
+                self.position,
                 color
             );
             if should_fail {
                 Err(WaylandError::SurfaceCreationFailed)
             } else {
+                self.connected = true;
+                self.last_color = Some(color);
                 Ok(())
             }
         })
     }
 
     fn disconnect(&mut self) {
+        self.connected = false;
         tracing::debug!("FailingMockBackend disconnected");
     }
 
@@ -244,6 +251,23 @@ mod tests {
         assert!(backend.is_connected());
         backend.disconnect();
         assert!(!backend.is_connected());
+    }
+
+    #[tokio::test]
+    async fn test_mock_tracks_last_color() {
+        let mut backend =
+            MockOverlayBackend::new(OverlayPosition::TopRight).expect("Failed to create backend");
+
+        let color1 = OverlayColor::opaque(255, 0, 0);
+        let color2 = OverlayColor::opaque(0, 255, 0);
+
+        assert_eq!(backend.last_color(), None, "Initial state should have no color");
+
+        assert!(backend.update_color(color1).await.is_ok());
+        assert_eq!(backend.last_color(), Some(color1), "Should track the updated color");
+
+        assert!(backend.update_color(color2).await.is_ok());
+        assert_eq!(backend.last_color(), Some(color2), "Should track the new color");
     }
 
     #[tokio::test]
@@ -298,5 +322,67 @@ mod tests {
 
         assert!(backend.update_color(color).await.is_ok());
         assert_eq!(backend.update_attempt_count(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_failing_mock_connect_sets_connected_state() {
+        let mut backend =
+            FailingMockBackend::new(OverlayPosition::TopRight).expect("Failed to create backend");
+        assert!(!backend.is_connected(), "Should initially be disconnected");
+
+        assert!(backend.connect().await.is_ok());
+        assert!(backend.is_connected(), "Should be connected after successful connect");
+    }
+
+    #[tokio::test]
+    async fn test_failing_mock_connect_does_not_set_state_on_failure() {
+        let mut backend =
+            FailingMockBackend::new(OverlayPosition::TopRight).expect("Failed to create backend");
+        backend = backend.fail_connect_n_times(1);
+
+        assert!(backend.connect().await.is_err());
+        assert!(!backend.is_connected(), "Should remain disconnected after failed connect");
+    }
+
+    #[tokio::test]
+    async fn test_failing_mock_update_color_sets_state() {
+        let mut backend =
+            FailingMockBackend::new(OverlayPosition::BottomLeft).expect("Failed to create backend");
+        let color = OverlayColor::opaque(255, 0, 0);
+
+        assert!(!backend.is_connected(), "Should initially be disconnected");
+        assert_eq!(backend.last_color(), None, "Should initially have no color");
+
+        assert!(backend.update_color(color).await.is_ok());
+        assert!(backend.is_connected(), "Should be connected after successful color update");
+        assert_eq!(
+            backend.last_color(),
+            Some(color),
+            "Should track the updated color"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_failing_mock_update_color_does_not_set_state_on_failure() {
+        let mut backend =
+            FailingMockBackend::new(OverlayPosition::BottomLeft).expect("Failed to create backend");
+        backend = backend.fail_update_color_n_times(1);
+        let color = OverlayColor::opaque(255, 0, 0);
+
+        assert!(backend.update_color(color).await.is_err());
+        assert!(!backend.is_connected(), "Should remain disconnected after failed color update");
+        assert_eq!(backend.last_color(), None, "Should not track color on failure");
+    }
+
+    #[tokio::test]
+    async fn test_failing_mock_disconnect_sets_connected_false() {
+        let mut backend =
+            FailingMockBackend::new(OverlayPosition::TopRight).expect("Failed to create backend");
+
+        assert!(backend.connect().await.is_ok());
+        assert!(backend.is_connected());
+
+        backend.disconnect();
+        assert!(!backend.is_connected(), "Should be disconnected after disconnect");
     }
 }

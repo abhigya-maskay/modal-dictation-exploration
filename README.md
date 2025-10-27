@@ -94,6 +94,8 @@ Example configuration:
 auto_sleep_timeout_secs = 300
 command_pause_threshold_ms = 700
 dictation_pause_threshold_ms = 900
+enable_activation_demo = false
+activation_demo_interval_secs = 10
 
 [overlay]
 awake_color = "green"
@@ -156,6 +158,125 @@ INFO phonesc: Config updated!
 - The config directory is watched (not just the file) to handle atomic writes from editors like vim and nano
 - All subscribers receive updates simultaneously through an efficient broadcast channel
 
+### Activation Demo Mode
+
+For development and testing purposes, you can enable automatic activation cycling to visually verify the overlay indicator works correctly:
+
+```toml
+enable_activation_demo = true
+activation_demo_interval_secs = 10
+```
+
+**Parameters:**
+
+- `enable_activation_demo` (default: `false`) - Enables automatic wake word triggering for testing
+- `activation_demo_interval_secs` (default: `10`) - How often (in seconds) to automatically trigger wake word
+
+**When enabled:**
+
+The system will automatically wake every N seconds as if a wake word was detected, then return to sleep after the configured `auto_sleep_timeout_secs`. This allows you to observe the overlay indicator cycling through Awake (green) and Asleep (gray) states without needing to trigger actual wake word detection.
+
+**Usage:**
+
+Enable this mode to verify that:
+- The overlay indicator is displaying correctly
+- State transitions are working as expected
+- Overlay reconnection recovers properly after errors
+
+**Note:** This is intended for development/testing only and should remain disabled (`false`) in production use.
+
+## For Integrators
+
+If you're integrating Phonesc into your application or building features on top of it, here's how to work with the activation system:
+
+### Keeping the System Awake During Active Use
+
+The `ActivationManager` includes an auto-sleep timer that puts the system to sleep after a configured period of inactivity. When your code is actively processing dictation or executing commands, you should notify the activation manager to prevent auto-sleep:
+
+```rust
+// During dictation processing, command execution, or any active user interaction:
+activation_manager.notify_activity();
+```
+
+**When to call `notify_activity()`:**
+
+- During voice activity detection (VAD) processing
+- While transcribing audio (dictation mode)
+- During command recognition and execution
+- Any time the user is actively interacting with the voice system
+
+**What it does:**
+
+- Resets the inactivity timer, extending the awake period
+- Does NOT change the system state (stays Awake if already Awake)
+- Prevents the system from sleeping while the user is actively dictating or issuing commands
+
+**Example integration:**
+
+```rust
+use std::sync::Arc;
+use phonesc::activation::ActivationManager;
+
+async fn process_dictation(
+    activation: &Arc<ActivationManager>,
+    audio_data: &[f32],
+) -> Result<String, Error> {
+    // Notify that we're actively processing user input
+    activation.notify_activity();
+
+    // Process the audio...
+    let transcription = transcribe_audio(audio_data).await?;
+
+    // Notify again if processing took significant time
+    activation.notify_activity();
+
+    Ok(transcription)
+}
+```
+
+### Subscribing to State Changes
+
+You can subscribe to activation state changes to update your UI or adjust behavior:
+
+```rust
+let mut state_rx = activation_manager.subscribe();
+
+tokio::spawn(async move {
+    while state_rx.changed().await.is_ok() {
+        let (state, transition) = *state_rx.borrow();
+
+        match state {
+            SystemState::Awake => {
+                // System is active - start listening for commands/dictation
+            }
+            SystemState::Asleep => {
+                // System is sleeping - only listen for wake word
+            }
+        }
+    }
+});
+```
+
+### Updating Configuration at Runtime
+
+Configuration changes are automatically broadcast to all subscribers. To react to config updates in your integration:
+
+```rust
+let mut config_rx = config_manager.subscribe();
+
+tokio::spawn(async move {
+    while config_rx.changed().await.is_ok() {
+        let config = config_rx.borrow().clone();
+
+        // Update your component with new config values
+        update_pause_thresholds(
+            config.command_pause_threshold_ms,
+            config.dictation_pause_threshold_ms,
+        );
+    }
+});
+```
+
 ## Overlay Indicator
 
 Phonesc displays a small 32x32px circular indicator in the top-right corner of your screen that shows the current system state:
@@ -191,7 +312,7 @@ Hex colors: `#RRGGBB` or `#RRGGBBAA` (with alpha channel)
 
 Changes to overlay configuration take effect immediately when you save the config file—no restart required! Edit colors or position and watch the indicator update in real-time.
 
-### Error Recovery
+### Error Recovery and Health Monitoring
 
 If the Wayland compositor disconnects (e.g., when switching to a different TTY or desktop environment), the overlay will:
 
@@ -199,6 +320,113 @@ If the Wayland compositor disconnects (e.g., when switching to a different TTY o
 2. Log a warning message
 3. Attempt to reconnect using exponential backoff (1s, 2s, 4s, 8s, 16s, 30s max)
 4. Resume normal operation once reconnected
+
+#### Monitoring Overlay Health
+
+The application provides detailed logging to help you monitor and troubleshoot overlay connection issues:
+
+**Connection Error Messages:**
+
+When the overlay loses connection to the Wayland compositor, you'll see:
+
+```
+WARN  Overlay connection error - attempting reconnection
+```
+
+This indicates the overlay backend failed to update and will attempt to reconnect.
+
+**Reconnection Progress:**
+
+During reconnection attempts, the logs show the backoff progress:
+
+```
+WARN  Overlay reconnecting in 2s (attempt 2)
+WARN  Overlay reconnecting in 4s (attempt 3)
+```
+
+The backoff sequence is: **1s → 2s → 4s → 8s → 16s → 30s (max)**
+
+After each successful reconnection, the backoff timer resets to 1s.
+
+**Successful Recovery:**
+
+When the connection is restored:
+
+```
+INFO  Overlay connection restored
+INFO  Overlay reconnected successfully
+```
+
+#### Monitoring Configuration Watcher Health
+
+The `ConfigManager` watches your config file for changes and can self-heal if the file watcher fails. You can monitor its health programmatically:
+
+**Checking Health Status:**
+
+```rust
+use phonesc::config::{ConfigManager, WatcherHealth};
+
+let health = config_manager.health_status();
+
+match health {
+    WatcherHealth::Healthy => {
+        // Config watcher is operating normally
+    }
+    WatcherHealth::Restarting { attempt } => {
+        // Watcher is restarting after a failure (attempt N of 5)
+    }
+    WatcherHealth::Failed { reason } => {
+        // Watcher failed permanently after 5 retry attempts
+        // Config changes will no longer be detected automatically
+    }
+}
+```
+
+**Health Check API:**
+
+```rust
+// Simple boolean check
+if !config_manager.is_healthy() {
+    tracing::warn!("Config watcher is not healthy - check logs");
+}
+
+// Subscribe to health status changes
+let mut health_rx = config_manager.health_subscribe();
+tokio::spawn(async move {
+    while health_rx.changed().await.is_ok() {
+        let health = health_rx.borrow().clone();
+        tracing::info!("Config watcher health: {:?}", health);
+    }
+});
+```
+
+**Watcher Restart Behavior:**
+
+The config watcher uses a supervised restart strategy:
+
+- **Max retry attempts**: 5
+- **Backoff strategy**: Exponential (1s, 2s, 4s, 8s, 16s)
+- **Reset condition**: If the watcher runs successfully for 60+ seconds, retry counter resets to 0
+- **Permanent failure**: After 5 failed attempts, the watcher stops and health status becomes `Failed`
+
+**Logs to Watch For:**
+
+```
+WARN  Config watcher exited unexpectedly after 2s
+WARN  Config watcher will restart (attempt 1/5) after 1s
+INFO  Config watcher healthy for 60s, resetting retry counter
+ERROR Config watcher failed permanently after 5 attempts
+```
+
+**Troubleshooting:**
+
+If you see `WatcherHealth::Failed`:
+1. Check file system permissions on `~/.config/phonesc/`
+2. Ensure the config directory hasn't been deleted or moved
+3. Look for file system errors in system logs (e.g., `dmesg`, `journalctl`)
+4. Restart the application to reinitialize the watcher
+
+**Note:** Even if the config watcher fails, the application continues running with the last successfully loaded configuration. You can still manually restart the application to reload configuration changes.
 
 ## License
 

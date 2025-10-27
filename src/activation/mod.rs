@@ -18,8 +18,6 @@ pub enum SystemState {
 pub enum StateTransition {
     /// Transition triggered by wake word detection
     WakeWord,
-    /// Transition triggered by sleep command
-    SleepCommand,
     /// Transition triggered by inactivity timeout
     InactivityTimeout,
 }
@@ -111,11 +109,6 @@ impl ActivationManager {
         state
     }
 
-    /// Returns the reason for the current state
-    pub fn current_transition(&self) -> StateTransition {
-        self.state_tx.borrow().1
-    }
-
     /// Wake the system via wake word detection
     ///
     /// Transitions from `Asleep` to `Awake` and logs the transition.
@@ -133,44 +126,21 @@ impl ActivationManager {
         }
     }
 
-    /// Sleep the system via sleep command
+    /// Notify the system of ongoing activity to keep it awake
     ///
-    /// Transitions from `Awake` to `Asleep` and logs the transition.
-    pub async fn sleep_via_command(&self) {
-        let mut state = self.inner.state.lock().await;
-        if *state == SystemState::Awake {
-            *state = SystemState::Asleep;
-            drop(state);
-            let mut transition = self.inner.transition.lock().await;
-            *transition = StateTransition::SleepCommand;
-            drop(transition);
-            let _ = self.state_tx.send((SystemState::Asleep, StateTransition::SleepCommand));
-            tracing::info!("State transition: Awake -> Asleep (via sleep command)");
-        }
-    }
-
-    /// Signal command activity while awake
+    /// This method should be called by dictation and command subsystems during
+    /// active use to reset the inactivity timer and prevent auto-sleep.
+    /// Unlike `wake_via_wake_word()`, this does not change the system state,
+    /// it only extends the awake period by resetting the timer.
     ///
-    /// Resets the inactivity timer if the system is currently awake.
-    pub async fn on_command_activity(&self) {
-        let state = self.inner.state.lock().await;
-        if *state == SystemState::Awake {
-            drop(state);
-            tracing::debug!("Command activity detected, resetting timer");
-            self.inner.activity.notify_one();
-        }
-    }
-
-    /// Signal dictation activity while awake
-    ///
-    /// Resets the inactivity timer if the system is currently awake.
-    pub async fn on_dictation_activity(&self) {
-        let state = self.inner.state.lock().await;
-        if *state == SystemState::Awake {
-            drop(state);
-            tracing::debug!("Dictation activity detected, resetting timer");
-            self.inner.activity.notify_one();
-        }
+    /// # Example
+    /// ```no_run
+    /// // Call periodically during dictation processing
+    /// activation_manager.notify_activity();
+    /// ```
+    pub fn notify_activity(&self) {
+        tracing::debug!("Activity heartbeat received");
+        self.inner.activity.notify_one();
     }
 
     /// Spawns the background timer task that monitors inactivity
@@ -250,36 +220,6 @@ impl Drop for ActivationManager {
 mod tests {
     use super::*;
 
-    /// Helper function to ensure background timer task processes
-    /// Uses the watch channel to detect state changes reliably
-    async fn wait_for_state(manager: &ActivationManager, expected_state: SystemState) {
-        if manager.current_state() == expected_state {
-            return;
-        }
-
-        let mut subscriber = manager.subscribe();
-
-        for _ in 0..100 {
-            if manager.current_state() == expected_state {
-                return;
-            }
-            tokio::task::yield_now().await;
-        }
-
-        for _ in 0..10 {
-            if subscriber.changed().await.is_ok() {
-                let (state, _) = *subscriber.borrow();
-                if state == expected_state {
-                    return;
-                }
-            } else {
-                break;
-            }
-        }
-
-        assert_eq!(manager.current_state(), expected_state, "Failed to reach expected state");
-    }
-
     #[tokio::test]
     async fn test_initial_state_is_asleep() {
         let manager = ActivationManager::new(300);
@@ -287,229 +227,172 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_wake_via_wake_word() {
+    async fn test_wake_transition_via_wake_word() {
         let manager = ActivationManager::new(300);
+        let mut rx = manager.subscribe();
+
         assert_eq!(manager.current_state(), SystemState::Asleep);
 
         manager.wake_via_wake_word().await;
-        assert_eq!(manager.current_state(), SystemState::Awake);
-    }
 
-    #[tokio::test]
-    async fn test_sleep_via_command() {
-        let manager = ActivationManager::new(300);
-        manager.wake_via_wake_word().await;
         assert_eq!(manager.current_state(), SystemState::Awake);
 
-        manager.sleep_via_command().await;
-        assert_eq!(manager.current_state(), SystemState::Asleep);
-    }
-
-    #[tokio::test]
-    async fn test_wake_is_idempotent() {
-        let manager = ActivationManager::new(300);
-        manager.wake_via_wake_word().await;
-        manager.wake_via_wake_word().await;
-        assert_eq!(manager.current_state(), SystemState::Awake);
-    }
-
-    #[tokio::test]
-    async fn test_sleep_is_idempotent() {
-        let manager = ActivationManager::new(300);
-        manager.sleep_via_command().await;
-        manager.sleep_via_command().await;
-        assert_eq!(manager.current_state(), SystemState::Asleep);
-    }
-
-    #[tokio::test]
-    async fn test_activity_resets_timer() {
-        tokio::time::pause();
-        let manager = ActivationManager::new(1);
-        manager.wake_via_wake_word().await;
-
-        tokio::time::advance(Duration::from_millis(500)).await;
-        wait_for_state(&manager, SystemState::Awake).await;
-
-        manager.on_command_activity().await;
-
-        tokio::time::advance(Duration::from_millis(500)).await;
-        wait_for_state(&manager, SystemState::Awake).await;
-
-        tokio::time::advance(Duration::from_millis(600)).await;
-        wait_for_state(&manager, SystemState::Asleep).await;
-    }
-
-    #[tokio::test]
-    async fn test_auto_sleep_on_timeout() {
-        tokio::time::pause();
-        let manager = ActivationManager::new(1);
-        manager.wake_via_wake_word().await;
-
-        tokio::time::advance(Duration::from_millis(1500)).await;
-        wait_for_state(&manager, SystemState::Asleep).await;
-    }
-
-    #[tokio::test]
-    async fn test_command_activity_while_awake() {
-        tokio::time::pause();
-        let manager = ActivationManager::new(2);
-        manager.wake_via_wake_word().await;
-
-        manager.on_command_activity().await;
-        tokio::time::advance(Duration::from_millis(600)).await;
-        tokio::task::yield_now().await;
-        assert_eq!(manager.current_state(), SystemState::Awake);
-    }
-
-    #[tokio::test]
-    async fn test_dictation_activity_while_awake() {
-        tokio::time::pause();
-        let manager = ActivationManager::new(2);
-        manager.wake_via_wake_word().await;
-
-        manager.on_dictation_activity().await;
-        tokio::time::advance(Duration::from_millis(600)).await;
-        tokio::task::yield_now().await;
-        assert_eq!(manager.current_state(), SystemState::Awake);
-    }
-
-    #[tokio::test]
-    async fn test_activity_while_asleep_does_nothing() {
-        tokio::time::pause();
-        let manager = ActivationManager::new(300);
-        assert_eq!(manager.current_state(), SystemState::Asleep);
-
-        manager.on_command_activity().await;
-        tokio::time::advance(Duration::from_millis(100)).await;
-        tokio::task::yield_now().await;
-        assert_eq!(manager.current_state(), SystemState::Asleep);
-
-        manager.on_dictation_activity().await;
-        tokio::time::advance(Duration::from_millis(100)).await;
-        tokio::task::yield_now().await;
-        assert_eq!(manager.current_state(), SystemState::Asleep);
-    }
-
-    #[tokio::test]
-    async fn test_subscriber_receives_state_updates() {
-        let manager = ActivationManager::new(300);
-        let mut subscriber = manager.subscribe();
-
-        let (state, _) = *subscriber.borrow();
-        assert_eq!(state, SystemState::Asleep);
-
-        manager.wake_via_wake_word().await;
-        assert!(subscriber.changed().await.is_ok());
-        let (state, reason) = *subscriber.borrow();
+        rx.changed().await.unwrap();
+        let (state, transition) = *rx.borrow_and_update();
         assert_eq!(state, SystemState::Awake);
-        assert_eq!(reason, StateTransition::WakeWord);
+        assert_eq!(transition, StateTransition::WakeWord);
 
-        manager.sleep_via_command().await;
-        assert!(subscriber.changed().await.is_ok());
-        let (state, reason) = *subscriber.borrow();
+        manager.wake_via_wake_word().await;
+        assert_eq!(manager.current_state(), SystemState::Awake);
+
+        assert!(!rx.has_changed().unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_inactivity_auto_sleep() {
+        tokio::time::pause();
+
+        let timeout_secs = 2;
+        let manager = ActivationManager::new(timeout_secs);
+        let mut rx = manager.subscribe();
+
+        manager.wake_via_wake_word().await;
+        assert_eq!(manager.current_state(), SystemState::Awake);
+
+        rx.changed().await.unwrap();
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        tokio::time::advance(Duration::from_secs(timeout_secs + 1)).await;
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        assert_eq!(manager.current_state(), SystemState::Asleep);
+
+        rx.changed().await.unwrap();
+        let (state, transition) = *rx.borrow_and_update();
         assert_eq!(state, SystemState::Asleep);
-        assert_eq!(reason, StateTransition::SleepCommand);
+        assert_eq!(transition, StateTransition::InactivityTimeout);
+    }
+
+    #[tokio::test]
+    async fn test_runtime_timeout_changes() {
+        tokio::time::pause();
+
+        let initial_timeout = 10;
+        let manager = ActivationManager::new(initial_timeout);
+        let mut rx = manager.subscribe();
+
+        manager.wake_via_wake_word().await;
+        rx.changed().await.unwrap();
+
+        tokio::time::advance(Duration::from_secs(5)).await;
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        assert_eq!(manager.current_state(), SystemState::Awake);
+
+        manager.set_timeout(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        tokio::time::advance(Duration::from_secs(3)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        assert_eq!(manager.current_state(), SystemState::Asleep);
+        rx.changed().await.unwrap();
+
+        manager.wake_via_wake_word().await;
+        rx.changed().await.unwrap();
+
+        manager.set_timeout(Duration::from_secs(10)).await;
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        tokio::time::advance(Duration::from_secs(5)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        assert_eq!(manager.current_state(), SystemState::Awake);
+    }
+
+    #[tokio::test]
+    async fn test_notify_activity_heartbeat() {
+        tokio::time::pause();
+
+        let timeout_secs = 5;
+        let manager = ActivationManager::new(timeout_secs);
+        let mut rx = manager.subscribe();
+
+        manager.wake_via_wake_word().await;
+        rx.changed().await.unwrap();
+
+        tokio::time::advance(Duration::from_secs(4)).await;
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        manager.notify_activity();
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        assert_eq!(manager.current_state(), SystemState::Awake);
+
+        tokio::time::advance(Duration::from_secs(4)).await;
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        manager.notify_activity();
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        assert_eq!(manager.current_state(), SystemState::Awake);
+
+        tokio::time::advance(Duration::from_secs(6)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        assert_eq!(manager.current_state(), SystemState::Asleep);
+        rx.changed().await.unwrap();
+        let (state, transition) = *rx.borrow_and_update();
+        assert_eq!(state, SystemState::Asleep);
+        assert_eq!(transition, StateTransition::InactivityTimeout);
     }
 
     #[tokio::test]
     async fn test_multiple_subscribers() {
-        let manager = ActivationManager::new(300);
-        let mut sub1 = manager.subscribe();
-        let mut sub2 = manager.subscribe();
-
-        let (state, _) = *sub1.borrow();
-        assert_eq!(state, SystemState::Asleep);
-        let (state, _) = *sub2.borrow();
-        assert_eq!(state, SystemState::Asleep);
-
-        manager.wake_via_wake_word().await;
-        assert!(sub1.changed().await.is_ok());
-        assert!(sub2.changed().await.is_ok());
-
-        let (state, _) = *sub1.borrow();
-        assert_eq!(state, SystemState::Awake);
-        let (state, _) = *sub2.borrow();
-        assert_eq!(state, SystemState::Awake);
-    }
-
-    #[tokio::test]
-    async fn test_current_state_returns_latest() {
-        let manager = ActivationManager::new(300);
-        assert_eq!(manager.current_state(), SystemState::Asleep);
-
-        manager.wake_via_wake_word().await;
-        assert_eq!(manager.current_state(), SystemState::Awake);
-
-        manager.sleep_via_command().await;
-        assert_eq!(manager.current_state(), SystemState::Asleep);
-    }
-
-    #[tokio::test]
-    async fn test_sleep_command_resets_timer() {
         tokio::time::pause();
-        let manager = ActivationManager::new(3);
+
+        let timeout_secs = 2;
+        let manager = ActivationManager::new(timeout_secs);
+
+        let mut rx1 = manager.subscribe();
+        let mut rx2 = manager.subscribe();
+        let mut rx3 = manager.subscribe();
+
         manager.wake_via_wake_word().await;
 
-        tokio::time::advance(Duration::from_millis(500)).await;
-        tokio::task::yield_now().await;
-        manager.sleep_via_command().await;
+        rx1.changed().await.unwrap();
+        let (state1, transition1) = *rx1.borrow_and_update();
+        assert_eq!(state1, SystemState::Awake);
+        assert_eq!(transition1, StateTransition::WakeWord);
 
-        tokio::time::advance(Duration::from_millis(2000)).await;
-        tokio::task::yield_now().await;
-        assert_eq!(manager.current_state(), SystemState::Asleep);
-    }
+        rx2.changed().await.unwrap();
+        let (state2, transition2) = *rx2.borrow_and_update();
+        assert_eq!(state2, SystemState::Awake);
+        assert_eq!(transition2, StateTransition::WakeWord);
 
-    #[tokio::test]
-    async fn test_multiple_activities_reset_timer() {
-        tokio::time::pause();
-        let manager = ActivationManager::new(2);
-        manager.wake_via_wake_word().await;
+        rx3.changed().await.unwrap();
+        let (state3, transition3) = *rx3.borrow_and_update();
+        assert_eq!(state3, SystemState::Awake);
+        assert_eq!(transition3, StateTransition::WakeWord);
 
-        for _ in 0..3 {
-            tokio::time::advance(Duration::from_millis(600)).await;
-            tokio::task::yield_now().await;
-            manager.on_command_activity().await;
-        }
+        tokio::time::advance(Duration::from_secs(timeout_secs + 1)).await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
 
-        wait_for_state(&manager, SystemState::Awake).await;
+        rx1.changed().await.unwrap();
+        let (state1, transition1) = *rx1.borrow_and_update();
+        assert_eq!(state1, SystemState::Asleep);
+        assert_eq!(transition1, StateTransition::InactivityTimeout);
 
-        tokio::time::advance(Duration::from_millis(2100)).await;
-        wait_for_state(&manager, SystemState::Asleep).await;
-    }
+        rx2.changed().await.unwrap();
+        let (state2, transition2) = *rx2.borrow_and_update();
+        assert_eq!(state2, SystemState::Asleep);
+        assert_eq!(transition2, StateTransition::InactivityTimeout);
 
-    #[tokio::test]
-    async fn test_set_timeout_updates_timer() {
-        tokio::time::pause();
-        let manager = ActivationManager::new(10);
-        manager.wake_via_wake_word().await;
-
-        tokio::time::advance(Duration::from_secs(2)).await;
-        wait_for_state(&manager, SystemState::Awake).await;
-
-        manager.set_timeout(Duration::from_secs(1)).await;
-        tracing::info!("Timeout updated to 1 second");
-
-        manager.on_command_activity().await;
-
-        tokio::time::advance(Duration::from_millis(1200)).await;
-        wait_for_state(&manager, SystemState::Asleep).await;
-    }
-
-    #[tokio::test]
-    async fn test_set_timeout_extends_timeout() {
-        tokio::time::pause();
-        let manager = ActivationManager::new(1);
-        manager.wake_via_wake_word().await;
-
-        manager.set_timeout(Duration::from_secs(5)).await;
-
-        tokio::time::advance(Duration::from_secs(2)).await;
-        wait_for_state(&manager, SystemState::Awake).await;
-
-        tokio::time::advance(Duration::from_secs(2)).await;
-        wait_for_state(&manager, SystemState::Awake).await;
-
-        tokio::time::advance(Duration::from_millis(1500)).await;
-        wait_for_state(&manager, SystemState::Asleep).await;
+        rx3.changed().await.unwrap();
+        let (state3, transition3) = *rx3.borrow_and_update();
+        assert_eq!(state3, SystemState::Asleep);
+        assert_eq!(transition3, StateTransition::InactivityTimeout);
     }
 }
