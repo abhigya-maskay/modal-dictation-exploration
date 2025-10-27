@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 mod manager;
-pub use manager::ConfigManager;
+pub use manager::{ConfigManager, WatcherHealth};
 
 /// Configuration error types
 #[derive(Debug, thiserror::Error)]
@@ -33,6 +33,12 @@ pub struct Config {
 
     #[serde(default)]
     pub dictation_service: DictationServiceConfig,
+
+    #[serde(default = "default_enable_activation_demo")]
+    pub enable_activation_demo: bool,
+
+    #[serde(default = "default_activation_demo_interval_secs")]
+    pub activation_demo_interval_secs: u64,
 }
 
 /// Overlay indicator configuration
@@ -74,15 +80,15 @@ fn default_dictation_pause_threshold() -> u64 {
 }
 
 fn default_overlay_awake_color() -> String {
-    "green".to_string()
+    crate::overlay::DEFAULT_AWAKE_COLOR_NAME.to_string()
 }
 
 fn default_overlay_asleep_color() -> String {
-    "gray".to_string()
+    crate::overlay::DEFAULT_ASLEEP_COLOR_NAME.to_string()
 }
 
 fn default_overlay_error_color() -> String {
-    "red".to_string()
+    crate::overlay::DEFAULT_ERROR_COLOR_NAME.to_string()
 }
 
 fn default_overlay_position() -> String {
@@ -95,6 +101,14 @@ fn default_dictation_host() -> String {
 
 fn default_dictation_port() -> u16 {
     5123
+}
+
+fn default_enable_activation_demo() -> bool {
+    false
+}
+
+fn default_activation_demo_interval_secs() -> u64 {
+    10
 }
 
 impl Default for OverlayConfig {
@@ -125,6 +139,8 @@ impl Default for Config {
             dictation_pause_threshold_ms: default_dictation_pause_threshold(),
             overlay: OverlayConfig::default(),
             dictation_service: DictationServiceConfig::default(),
+            enable_activation_demo: default_enable_activation_demo(),
+            activation_demo_interval_secs: default_activation_demo_interval_secs(),
         }
     }
 }
@@ -163,32 +179,6 @@ impl Config {
                 Self::default()
             }
         }
-    }
-
-    /// Load configuration from ~/.config/phonesc/config.toml
-    ///
-    /// Falls back to defaults if the file doesn't exist or cannot be parsed.
-    /// Logs errors but does not crash the application.
-    pub fn load() -> Self {
-        let config_path = match Self::config_path() {
-            Ok(path) => path,
-            Err(e) => {
-                tracing::warn!("Could not determine config directory: {}, using defaults", e);
-                return Self::default();
-            }
-        };
-
-        tracing::debug!("Looking for config at: {}", config_path.display());
-        Self::load_from_path(config_path)
-    }
-
-    /// Returns the expected path to the config file
-    fn config_path() -> Result<PathBuf, ConfigError> {
-        let config_dir = dirs::config_dir()
-            .ok_or(ConfigError::DirectoryNotFound)?
-            .join("phonesc");
-
-        Ok(config_dir.join("config.toml"))
     }
 }
 
@@ -298,5 +288,57 @@ mod tests {
         assert_eq!(service.host, "127.0.0.1");
         assert_eq!(service.port, 5123);
         assert_eq!(service.url(), "http://127.0.0.1:5123");
+    }
+
+    #[test]
+    fn test_demo_config_defaults() {
+        let config = Config::default();
+        assert_eq!(config.enable_activation_demo, false);
+        assert_eq!(config.activation_demo_interval_secs, 10);
+    }
+
+    #[test]
+    fn test_parse_demo_config_enabled() {
+        let toml_str = r#"
+            enable_activation_demo = true
+            activation_demo_interval_secs = 5
+        "#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.enable_activation_demo, true);
+        assert_eq!(config.activation_demo_interval_secs, 5);
+    }
+
+    #[test]
+    fn test_parse_demo_config_disabled() {
+        let toml_str = r#"
+            enable_activation_demo = false
+            activation_demo_interval_secs = 15
+        "#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.enable_activation_demo, false);
+        assert_eq!(config.activation_demo_interval_secs, 15);
+    }
+
+    #[test]
+    fn test_parse_config_with_demo_and_other_settings() {
+        let toml_str = r#"
+            auto_sleep_timeout_secs = 600
+            enable_activation_demo = true
+            activation_demo_interval_secs = 8
+
+            [overlay]
+            awake_color = "blue"
+            asleep_color = "white"
+
+            [dictation_service]
+            host = "192.168.1.100"
+            port = 8080
+        "#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.auto_sleep_timeout_secs, 600);
+        assert_eq!(config.enable_activation_demo, true);
+        assert_eq!(config.activation_demo_interval_secs, 8);
+        assert_eq!(config.overlay.awake_color, "blue");
+        assert_eq!(config.dictation_service.host, "192.168.1.100");
     }
 }

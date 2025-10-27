@@ -38,6 +38,8 @@
             wayland
             wayland-protocols
             libxkbcommon
+            xorg.libxcb
+            xorg.libX11
 
             # ML/ASR dependencies
             onnxruntime
