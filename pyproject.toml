@@ -1,0 +1,42 @@
+[tool.poetry]
+name = "modal-dictation-exploration"
+version = "0.1.0"
+description = "Wayland voice-control prototype experiments"
+authors = ["Abhigya Maskay <ave70011@gmail.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.10.0"
+pytest = "^8.3.3"
+pyright = "^1.1.386"
+pre-commit = "^4.4.0"
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.pyright]
+include = ["src"]
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"
