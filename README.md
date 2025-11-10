@@ -24,3 +24,16 @@ High-level notes for a personal Wayland voice-control prototype.
 - Extend or wrap `wtype` later if specialized events or composition behaviors are needed.
 
 More detail will be added as the design solidifies.
+
+## Development Environment
+
+This repo is managed with Nix flakes and Poetry.
+
+1. Enter the dev shell: `nix develop`.
+2. Install Python deps (first run only): `poetry install`.
+3. Install git hooks: `poetry run pre-commit install`.
+4. Run formatting/linting/tests (hooks run these automatically on commit):
+   - `poetry run black .`
+   - `ruff check .`
+   - `poetry run pytest`
+   - `poetry run pyright`
