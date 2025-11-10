@@ -1,0 +1,20 @@
+/* Example styles for the Modal Dictation indicator. */
+
+#custom-modal-dictation,
+.custom-modal-dictation {
+  color: #ff4d4f;
+  font-size: 15px;
+  padding: 0 6px;
+}
+
+.custom-modal-dictation.modal-listening {
+  color: #fadb14; /* Amber while listening. */
+}
+
+.custom-modal-dictation.modal-dictating {
+  color: #73d13d; /* Green while dictating. */
+}
+
+.custom-modal-dictation.modal-error {
+  color: #ff7875; /* Lighter red for error states. */
+}

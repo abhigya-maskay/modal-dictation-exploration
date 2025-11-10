@@ -1,0 +1,12 @@
+{
+  // Merge this block into the "modules" section of your Waybar config and add
+  // "custom/modal-dictation" to the desired position in the "modules-right"
+  // (or left/center) array.
+  "custom/modal-dictation": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 2,
+    "tooltip": true,
+    "exec": "/absolute/path/to/repo/scripts/modal_status.py"
+  }
+}
