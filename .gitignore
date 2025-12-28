@@ -22,6 +22,11 @@ build/
 *.swp
 *.swo
 
+# Emacs
+\#*\#
+.\#*
+*~
+
 # Environment
 .env
 .envrc.local
@@ -34,6 +39,9 @@ htmlcov/
 # Type checking
 .mypy_cache/
 .ty/
+
+# Linting
+.ruff_cache/
 
 # OS
 .DS_Store

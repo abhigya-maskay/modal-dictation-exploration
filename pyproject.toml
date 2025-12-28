@@ -1,14 +1,22 @@
 [project]
 name = "modal-dictation-exploration"
 version = "0.1.0"
-description = "Add your description here"
+description = "Voice control software for Linux and macOS with modal dictation support"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pillow>=12.0.0",
+    "pygobject>=3.54.5",
+    "pystray>=0.19.5",
+]
+
+[project.scripts]
+modal-dictation-exploration = "modal_dictation_exploration.main:main"
 
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "pytest-mock>=3.15.1",
     "ruff>=0.14.10",
     "ty>=0.0.7",
 ]
@@ -34,3 +42,17 @@ indent-style = "space"
 
 [tool.ty.environment]
 python-version = "3.12"
+extra-paths = ["typings"]
+python-platform = "linux"
+
+[tool.ty.rules]
+possibly-unresolved-reference = "error"
+possibly-missing-attribute = "error"
+possibly-missing-import = "error"
+unused-ignore-comment = "warn"
+
+[tool.ty.terminal]
+error-on-warning = true
+
+[tool.uv]
+package = true
