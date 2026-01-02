@@ -1,18 +1,26 @@
 """Pytest configuration and fixtures."""
 
 import sys
-from unittest.mock import MagicMock
 
 import pytest
 
-# Ensure pystray mock exists before any imports
-if "pystray" not in sys.modules or not isinstance(sys.modules["pystray"], MagicMock):
-    sys.modules["pystray"] = MagicMock()
+# Imported for side effects: registers mocks in sys.modules before other imports
+from tests.mocks import pystray as _pystray  # noqa: F401
+from tests.mocks import pulsectl as _pulsectl  # noqa: F401
 
 
 @pytest.fixture
 def pystray_mock():
     """Provide a fresh pystray mock for tests that need it."""
     mock = sys.modules["pystray"]
+    mock.reset_mock()
+    mock.Icon.side_effect = None
+    return mock
+
+
+@pytest.fixture
+def pulsectl_mock():
+    """Provide a fresh pulsectl mock for tests that need it."""
+    mock = sys.modules["pulsectl"]
     mock.reset_mock()
     return mock

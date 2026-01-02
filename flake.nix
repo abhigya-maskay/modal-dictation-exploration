@@ -8,10 +8,8 @@
 
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = import nixpkgs { inherit system; };
-      in
-      {
+      let pkgs = import nixpkgs { inherit system; };
+      in {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             # uv manages Python and all Python tooling
@@ -30,7 +28,7 @@
             zlib.dev
             libffi
             libffi.dev
-            stdenv.cc.cc.lib  # libstdc++
+            stdenv.cc.cc.lib # libstdc++
 
             # GTK/GObject for pystray menu support
             cairo
@@ -39,6 +37,9 @@
             glib.dev
             gobject-introspection
             gtk3
+
+            # Audio device support for pulsectl
+            libpulseaudio
 
             # Development utilities
             git
@@ -53,10 +54,12 @@
             # GObject introspection for PyGObject
             export GI_TYPELIB_PATH="${pkgs.gtk3}/lib/girepository-1.0:${pkgs.glib}/lib/girepository-1.0:${pkgs.gobject-introspection}/lib/girepository-1.0''${GI_TYPELIB_PATH:+:$GI_TYPELIB_PATH}"
 
+            # Library path for native libraries (libpulse for pulsectl)
+            export LD_LIBRARY_PATH="${pkgs.libpulseaudio}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
             # Use GTK backend for pystray (required for menu support on X11/bspwm)
             export PYSTRAY_BACKEND=gtk
           '';
         };
-      }
-    );
+      });
 }
