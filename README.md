@@ -2,6 +2,27 @@
 
 Voice control software for Linux and macOS.
 
+## Prerequisites
+
+### Linux
+
+Install PortAudio for audio device support:
+
+```bash
+# Debian/Ubuntu
+sudo apt install libportaudio2
+
+# Fedora
+sudo dnf install portaudio
+
+# Arch
+sudo pacman -S portaudio
+```
+
+### macOS
+
+No additional dependencies required - PortAudio is bundled with the Python package.
+
 ## Development
 
 ### Quick Start

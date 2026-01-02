@@ -5,7 +5,10 @@ description = "Voice control software for Linux and macOS with modal dictation s
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "pasimple>=0.0.3",
     "pillow>=12.0.0",
+    "pulsectl>=24.12.0",
+    "pydantic>=2.12.5",
     "pygobject>=3.54.5",
     "pystray>=0.19.5",
 ]
@@ -15,7 +18,9 @@ modal-dictation-exploration = "modal_dictation_exploration.main:main"
 
 [dependency-groups]
 dev = [
+    "polyfactory>=3.2.0",
     "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
     "pytest-mock>=3.15.1",
     "ruff>=0.14.10",
     "ty>=0.0.7",

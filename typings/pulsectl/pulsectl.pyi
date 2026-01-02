@@ -1,0 +1,2 @@
+class EnumValue:
+    name: str

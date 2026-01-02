@@ -2,6 +2,8 @@ from collections.abc import Callable
 
 from PIL.Image import Image
 
+type MenuItemAction = Callable[[Icon, MenuItem], None] | Menu | None
+
 class Icon:
     def __init__(
         self,
@@ -20,5 +22,7 @@ class MenuItem:
     def __init__(
         self,
         text: str,
-        action: Callable[[Icon, MenuItem], None],
+        action: MenuItemAction,
+        checked: Callable[[MenuItem], bool] | None = None,
+        enabled: bool | Callable[[MenuItem], bool] = True,
     ) -> None: ...
