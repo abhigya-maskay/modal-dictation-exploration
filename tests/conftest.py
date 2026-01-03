@@ -6,7 +6,6 @@ import pytest
 
 # Imported for side effects: registers mocks in sys.modules before other imports
 from tests.mocks import pystray as _pystray  # noqa: F401
-from tests.mocks import pulsectl as _pulsectl  # noqa: F401
 
 
 @pytest.fixture
@@ -15,12 +14,4 @@ def pystray_mock():
     mock = sys.modules["pystray"]
     mock.reset_mock()
     mock.Icon.side_effect = None
-    return mock
-
-
-@pytest.fixture
-def pulsectl_mock():
-    """Provide a fresh pulsectl mock for tests that need it."""
-    mock = sys.modules["pulsectl"]
-    mock.reset_mock()
     return mock

@@ -5,12 +5,11 @@ description = "Voice control software for Linux and macOS with modal dictation s
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "pasimple>=0.0.3",
     "pillow>=12.0.0",
-    "pulsectl>=24.12.0",
     "pydantic>=2.12.5",
     "pygobject>=3.54.5",
     "pystray>=0.19.5",
+    "sounddevice>=0.5.3",
 ]
 
 [project.scripts]

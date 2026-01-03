@@ -39,8 +39,8 @@ def _on_quit(icon: pystray.Icon, _item: pystray.MenuItem) -> None:
 
 
 def make_device_selected_callback(
-    selected_device: AsyncBehaviorSubject[str | None],
-    device_name: str,
+    selected_device: AsyncBehaviorSubject[int | None],
+    device_index: int,
 ):
     """Create a callback that selects an audio device.
 
@@ -53,14 +53,14 @@ def make_device_selected_callback(
     """
 
     def callback(_icon: pystray.Icon, _item: pystray.MenuItem) -> None:
-        selected_device.next(device_name)
+        selected_device.next(device_index)
 
     return callback
 
 
 def make_device_checked_callback(
-    selected_device: AsyncBehaviorSubject[str | None],
-    device_name: str,
+    selected_device: AsyncBehaviorSubject[int | None],
+    device_index: int,
 ):
     """Create a callback that checks if a device is selected.
 
@@ -73,13 +73,13 @@ def make_device_checked_callback(
     """
 
     def callback(_item: pystray.MenuItem) -> bool:
-        return selected_device.value == device_name
+        return selected_device.value == device_index
 
     return callback
 
 
 def _create_audio_devices_menu_item(
-    selected_device: AsyncBehaviorSubject[str | None],
+    selected_device: AsyncBehaviorSubject[int | None],
 ) -> pystray.MenuItem:
     """Create the menu item for audio input device selection.
 
@@ -93,9 +93,9 @@ def _create_audio_devices_menu_item(
 
     menu_items = [
         pystray.MenuItem(
-            device.description,
-            make_device_selected_callback(selected_device, device.name),
-            checked=make_device_checked_callback(selected_device, device.name),
+            device.name,
+            make_device_selected_callback(selected_device, device.index),
+            checked=make_device_checked_callback(selected_device, device.index),
         )
         for device in devices
     ]

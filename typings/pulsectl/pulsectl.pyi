@@ -1,2 +1,0 @@
-class EnumValue:
-    name: str
