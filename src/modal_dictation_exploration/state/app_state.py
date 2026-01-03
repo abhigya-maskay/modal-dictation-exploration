@@ -7,4 +7,4 @@ from modal_dictation_exploration.state.async_behavior_subject import (
 
 @dataclass
 class AppState:
-    selected_device: AsyncBehaviorSubject[str | None]
+    selected_device: AsyncBehaviorSubject[int | None]

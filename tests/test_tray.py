@@ -56,9 +56,7 @@ def test_setup_tray_creates_menu_with_quit_item(pystray_mock):
     setup_tray(state)
 
     quit_calls = [
-        call
-        for call in pystray_mock.MenuItem.call_args_list
-        if call[0][0] == "Quit"
+        call for call in pystray_mock.MenuItem.call_args_list if call[0][0] == "Quit"
     ]
     assert len(quit_calls) == 1
 
@@ -94,8 +92,8 @@ def test_setup_tray_audio_devices_submenu_lists_input_devices(pystray_mock):
     """Submenu contains menu items for each input device."""
     state = create_app_state()
     devices = [
-        AudioDeviceFactory.build(description="MOTU M2"),
-        AudioDeviceFactory.build(description="Built-in Microphone"),
+        AudioDeviceFactory.build(name="MOTU M2"),
+        AudioDeviceFactory.build(name="Built-in Microphone"),
     ]
 
     with patch(
@@ -103,9 +101,7 @@ def test_setup_tray_audio_devices_submenu_lists_input_devices(pystray_mock):
     ):
         setup_tray(state)
 
-        menu_item_names = [
-            call[0][0] for call in pystray_mock.MenuItem.call_args_list
-        ]
+        menu_item_names = [call[0][0] for call in pystray_mock.MenuItem.call_args_list]
         assert "MOTU M2" in menu_item_names
         assert "Built-in Microphone" in menu_item_names
 
@@ -114,9 +110,7 @@ def test_setup_tray_audio_devices_submenu_shows_no_devices_when_empty(pystray_mo
     """Shows disabled 'No devices found' when no devices."""
     state = create_app_state()
 
-    with patch(
-        "modal_dictation_exploration.tray.list_input_devices", return_value=[]
-    ):
+    with patch("modal_dictation_exploration.tray.list_input_devices", return_value=[]):
         setup_tray(state)
 
         menu_item_calls = pystray_mock.MenuItem.call_args_list
@@ -135,17 +129,17 @@ def test_make_device_selected_callback_updates_selected_device():
     """Invoking the callback updates selected_device state."""
     state = create_app_state()
 
-    callback = make_device_selected_callback(state.selected_device, "alsa_input.usb-MOTU_M2")
+    callback = make_device_selected_callback(state.selected_device, 42)
     callback(MagicMock(), MagicMock())
 
-    assert state.selected_device.value == "alsa_input.usb-MOTU_M2"
+    assert state.selected_device.value == 42
 
 
 def test_make_device_checked_callback_returns_true_when_device_is_selected():
-    """Returns True when the device name matches selected_device."""
+    """Returns True when the device index matches selected_device."""
     state = create_app_state()
-    state.selected_device.next("alsa_input.usb-MOTU_M2")
+    state.selected_device.next(42)
 
-    callback = make_device_checked_callback(state.selected_device, "alsa_input.usb-MOTU_M2")
+    callback = make_device_checked_callback(state.selected_device, 42)
 
     assert callback(MagicMock()) is True
