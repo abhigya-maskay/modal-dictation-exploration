@@ -4,6 +4,7 @@ from modal_dictation_exploration.state.app_state import AppState
 from modal_dictation_exploration.state.async_behavior_subject import (
     AsyncBehaviorSubject,
 )
+from modal_dictation_exploration.transcription import Transcriber
 from modal_dictation_exploration.tray import setup_tray
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,8 @@ def main() -> None:
     logger.info("Modal dictation application started")
 
     state = create_app_state()
-    icon = setup_tray(state)
+    transcriber = Transcriber()
+    icon = setup_tray(state, transcriber)
     icon.run()
 
 
