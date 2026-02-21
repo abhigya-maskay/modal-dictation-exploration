@@ -1,6 +1,19 @@
+import numpy as np
+from numpy.typing import DTypeLike
+
 from modal_dictation_exploration.types.sounddevice import DeviceInfo, HostApiInfo
 
 def query_hostapis() -> tuple[HostApiInfo, ...]: ...
 def query_devices(device: int) -> DeviceInfo: ...
+def rec(
+    frames: int,
+    samplerate: float,
+    device: int,
+    channels: int,
+    dtype: DTypeLike,
+    blocking: bool = False,
+) -> np.ndarray: ...
+def wait() -> None: ...
+def stop() -> None: ...
 
 class PortAudioError(Exception): ...

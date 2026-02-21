@@ -1,21 +1,32 @@
+import logging
+from concurrent.futures import ThreadPoolExecutor
+
 import pystray
 from PIL import Image, ImageDraw
 
-from modal_dictation_exploration.audio import list_input_devices
+logger = logging.getLogger(__name__)
+
+from modal_dictation_exploration.audio import (
+    list_input_devices,
+    prepare_audio_for_transcription,
+    record_audio,
+)
 from modal_dictation_exploration.state.app_state import AppState
 from modal_dictation_exploration.state.async_behavior_subject import (
     AsyncBehaviorSubject,
 )
+from modal_dictation_exploration.transcription import Transcriber
 
 __all__ = [
     "setup_tray",
-    "make_device_selected_callback",
-    "make_device_checked_callback",
 ]
 
 # Constants
 DEFAULT_ICON_SIZE = 64
 ICON_COLOR_ACTIVE = "green"
+
+# Audio executor - created before pystray to avoid GTK/PulseAudio thread conflicts
+_audio_executor = ThreadPoolExecutor(max_workers=1)
 
 
 def _create_icon_image(size: int = DEFAULT_ICON_SIZE) -> Image.Image:
@@ -38,44 +49,50 @@ def _on_quit(icon: pystray.Icon, _item: pystray.MenuItem) -> None:
     icon.stop()
 
 
-def make_device_selected_callback(
+
+
+
+def _create_record_transcribe_menu_item(
     selected_device: AsyncBehaviorSubject[int | None],
-    device_index: int,
-):
-    """Create a callback that selects an audio device.
+    transcriber: Transcriber,
+) -> pystray.MenuItem:
+    def make_record_transcribe_callback():
+        def do_record_transcribe() -> None:
+            try:
+                device_index = selected_device.value
+                assert device_index is not None
 
-    Args:
-        selected_device: The subject to update when the device is selected.
-        device_index: The device index to set when the callback is invoked.
+                logger.info(f"Starting recording from device {device_index}")
+                audio_data, sample_rate = record_audio(device_index)
+                logger.info(f"Recording complete: {audio_data.shape}, {sample_rate}Hz")
+                logger.info(f"Audio stats: min={audio_data.min():.6f}, max={audio_data.max():.6f}, mean={audio_data.mean():.6f}")
 
-    Returns:
-        A callback function compatible with pystray.MenuItem.
-    """
+                logger.info("Processing audio for transcription")
+                processed_audio = prepare_audio_for_transcription(audio_data, sample_rate)
+                logger.info(f"Audio processed: {processed_audio.shape}")
+                logger.info(f"Processed audio stats: min={processed_audio.min():.6f}, max={processed_audio.max():.6f}, mean={processed_audio.mean():.6f}")
 
-    def callback(_icon: pystray.Icon, _item: pystray.MenuItem) -> None:
-        selected_device.next(device_index)
+                logger.info("Starting transcription")
+                transcription = transcriber.transcribe(processed_audio)
+                logger.info(f"Transcription: {transcription}")
+            except Exception as e:
+                logger.exception(f"Error during record/transcribe: {e}")
 
-    return callback
+        def callback(_icon: pystray.Icon, _item: pystray.MenuItem) -> None:
+            logger.info("Record & Transcribe callback triggered")
+            _audio_executor.submit(do_record_transcribe)
+            logger.info("Task submitted to audio executor")
 
+        return callback
 
-def make_device_checked_callback(
-    selected_device: AsyncBehaviorSubject[int | None],
-    device_index: int,
-):
-    """Create a callback that checks if a device is selected.
+    def is_enabled(_item: pystray.MenuItem) -> bool:
+        return selected_device.value is not None
 
-    Args:
-        selected_device: The subject containing the currently selected device.
-        device_index: The device index to check against.
-
-    Returns:
-        A callback function compatible with pystray.MenuItem's checked parameter.
-    """
-
-    def callback(_item: pystray.MenuItem) -> bool:
-        return selected_device.value == device_index
-
-    return callback
+    return pystray.MenuItem(
+        "Record & Transcribe (5s)",
+        make_record_transcribe_callback(),
+        enabled=is_enabled,
+    )
 
 
 def _create_audio_devices_menu_item(
@@ -87,6 +104,19 @@ def _create_audio_devices_menu_item(
         A pystray.MenuItem containing either a submenu of available input devices,
         or a disabled "No devices found" item if no input devices are available.
     """
+
+    def make_device_selected_callback(device_index: int):
+        def callback(_icon: pystray.Icon, _item: pystray.MenuItem) -> None:
+            selected_device.next(device_index)
+
+        return callback
+
+    def make_device_checked_callback(device_index: int):
+        def callback(_item: pystray.MenuItem) -> bool:
+            return selected_device.value == device_index
+
+        return callback
+
     devices = list_input_devices()
     if not devices:
         return pystray.MenuItem("No devices found", None, enabled=False)
@@ -94,15 +124,15 @@ def _create_audio_devices_menu_item(
     menu_items = [
         pystray.MenuItem(
             device.name,
-            make_device_selected_callback(selected_device, device.index),
-            checked=make_device_checked_callback(selected_device, device.index),
+            make_device_selected_callback(device.index),
+            checked=make_device_checked_callback(device.index),
         )
         for device in devices
     ]
     return pystray.MenuItem("Audio Devices", pystray.Menu(*menu_items))
 
 
-def setup_tray(state: AppState) -> pystray.Icon:
+def setup_tray(state: AppState, transcriber: Transcriber) -> pystray.Icon:
     """Set up and return the system tray icon.
 
     Raises:
@@ -112,6 +142,7 @@ def setup_tray(state: AppState) -> pystray.Icon:
         image = _create_icon_image()
         menu = pystray.Menu(
             _create_audio_devices_menu_item(state.selected_device),
+            _create_record_transcribe_menu_item(state.selected_device, transcriber),
             pystray.MenuItem("Quit", _on_quit),
         )
         icon = pystray.Icon("modal-dictation", image, "Modal Dictation", menu)

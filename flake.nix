@@ -91,6 +91,9 @@
             # Library path for native libraries (libpulse for pulsectl, portaudio for sounddevice)
             export LD_LIBRARY_PATH="${portaudio-pulse}/lib:${pkgs.libpulseaudio}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
+            # CUDA driver library from NixOS system (PyTorch wheels bundle CUDA runtime)
+            export LD_LIBRARY_PATH="/run/opengl-driver/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
             # Use GTK backend for pystray (required for menu support on X11/bspwm)
             export PYSTRAY_BACKEND=gtk
           '';
