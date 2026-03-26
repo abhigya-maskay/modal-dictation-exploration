@@ -1,0 +1,244 @@
+# Modal Dictation — Default Configuration
+# Location: ~/.modal-dictation/config.toml
+
+# ------------------------------------------------------------------------------
+# Hotkeys
+# ------------------------------------------------------------------------------
+# Each hotkey can be a keyboard key string (e.g., "f18") or an HID device table
+# with vendor_id, product_id, and button (for foot pedals or similar devices).
+#
+# Keyboard example:   dictation_hold = "f18"
+# HID device example:
+#   [hotkeys.dictation_hold_device]
+#   vendor_id = 0x1234
+#   product_id = 0x5678
+#   button = 1
+
+[hotkeys]
+dictation_hold = "fn"
+sleep_toggle = "f15"
+
+# ------------------------------------------------------------------------------
+# Microphone
+# ------------------------------------------------------------------------------
+# device_id: Audio input device identifier. Omit or leave empty for system default.
+
+[mic]
+# device_id = ""
+
+# ------------------------------------------------------------------------------
+# Speech Recognition
+# ------------------------------------------------------------------------------
+
+[speech]
+# Seconds of silence before speech is processed
+timeout = 0.3
+
+# Minutes of inactivity before entering sleep mode (comment out to disable)
+auto_sleep_minutes = 3.0
+
+# ------------------------------------------------------------------------------
+# Commands — Actions
+# ------------------------------------------------------------------------------
+# Phrase → app action. These trigger application behavior, not keystrokes.
+
+[commands.actions]
+"dictation mode" = "mode:dictation"
+"command mode" = "mode:command"
+"go to sleep" = "app:sleep"
+"wake up" = "app:wake"
+
+# ------------------------------------------------------------------------------
+# Commands — Modifiers
+# ------------------------------------------------------------------------------
+# Spoken form → modifier key. These compose with keys (e.g., "command adam" → cmd+a).
+
+[commands.modifiers]
+"command" = "cmd"
+"super" = "cmd"
+"control" = "ctrl"
+"shift" = "shift"
+"option" = "alt"
+"alt" = "alt"
+"function" = "fn"
+"globe" = "fn"
+
+# ------------------------------------------------------------------------------
+# Commands — Keys
+# ------------------------------------------------------------------------------
+# Spoken form → key name or character. Includes letters, numbers, arrows,
+# function keys, special keys, and symbols.
+
+[commands.keys]
+
+# Letters (police alphabet)
+"adam" = "a"
+"boy" = "b"
+"charlie" = "c"
+"david" = "d"
+"edward" = "e"
+"frank" = "f"
+"george" = "g"
+"henry" = "h"
+"ida" = "i"
+"john" = "j"
+"king" = "k"
+"lincoln" = "l"
+"mary" = "m"
+"nora" = "n"
+"ocean" = "o"
+"papa" = "p"
+"queen" = "q"
+"robert" = "r"
+"sam" = "s"
+"tom" = "t"
+"union" = "u"
+"victor" = "v"
+"william" = "w"
+"xray" = "x"
+"young" = "y"
+"zebra" = "z"
+
+# Numbers
+"zero" = "0"
+"one" = "1"
+"two" = "2"
+"three" = "3"
+"four" = "4"
+"five" = "5"
+"six" = "6"
+"seven" = "7"
+"eight" = "8"
+"nine" = "9"
+
+# Arrow keys
+"up" = "up"
+"down" = "down"
+"left" = "left"
+"right" = "right"
+
+# Special keys
+"minus" = "minus"
+"return" = "return"
+"enter" = "enter"
+"page down" = "pagedown"
+"page up" = "pageup"
+"escape" = "escape"
+"space" = "space"
+"tab" = "tab"
+"insert" = "insert"
+"wipe" = "backspace"
+"delete" = "backspace"
+"forward delete" = "delete"
+"menu key" = "menu"
+"print screen" = "printscr"
+
+# Function keys
+"f one" = "f1"
+"f two" = "f2"
+"f three" = "f3"
+"f four" = "f4"
+"f five" = "f5"
+"f six" = "f6"
+"f seven" = "f7"
+"f eight" = "f8"
+"f nine" = "f9"
+"f ten" = "f10"
+"f eleven" = "f11"
+"f twelve" = "f12"
+"f thirteen" = "f13"
+"f fourteen" = "f14"
+"f fifteen" = "f15"
+"f sixteen" = "f16"
+"f seventeen" = "f17"
+"f eighteen" = "f18"
+"f nineteen" = "f19"
+"f twenty" = "f20"
+
+# Symbols — punctuation
+"back tick" = "`"
+"grave" = "`"
+"comma" = ","
+"coma" = ","
+"period" = "."
+"full stop" = "."
+"point" = "."
+"semicolon" = ";"
+"semi" = ";"
+"colon" = ":"
+"question mark" = "?"
+"question" = "?"
+"exclamation mark" = "!"
+"exclamation point" = "!"
+"asterisk" = "*"
+"star" = "*"
+"hash sign" = "#"
+"number sign" = "#"
+"hash" = "#"
+"percent sign" = "%"
+"percent" = "%"
+"at symbol" = "@"
+"at sign" = "@"
+"ampersand" = "&"
+"and sign" = "&"
+"amper" = "&"
+"hyphen" = "-"
+"dash" = "-"
+"equals" = "="
+"plus" = "+"
+"tilde" = "~"
+"down score" = "_"
+"underscore" = "_"
+
+# Symbols — brackets and parens
+"paren" = "("
+"L paren" = "("
+"left paren" = "("
+"R paren" = ")"
+"right paren" = ")"
+"brack" = "["
+"L brack" = "["
+"bracket" = "["
+"L bracket" = "["
+"left bracket" = "["
+"square" = "["
+"L square" = "["
+"left square" = "["
+"R brack" = "]"
+"R bracket" = "]"
+"right bracket" = "]"
+"R square" = "]"
+"right square" = "]"
+"forward slash" = "/"
+"slash" = "/"
+"backslash" = "\\"
+"curly bracket" = "{"
+"left curly bracket" = "{"
+"R brace" = "}"
+"right brace" = "}"
+"R curly bracket" = "}"
+"right curly bracket" = "}"
+
+# Symbols — comparison and logic
+"angle" = "<"
+"L Angle" = "<"
+"left angle" = "<"
+"less than" = "<"
+"rangle" = ">"
+"R angle" = ">"
+"right angle" = ">"
+"greater than" = ">"
+"exponent" = "^"
+"pipe" = "|"
+
+# Symbols — quotes
+"quote" = "'"
+"apostrophe" = "'"
+"dub quote" = "\""
+"double quote" = "\""
+
+# Symbols — currency
+"dollar sign" = "$"
+"dollar" = "$"
+"pound sign" = "£"
+"pound" = "£"
