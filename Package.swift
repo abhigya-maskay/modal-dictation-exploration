@@ -14,6 +14,7 @@ let package = Package(
         .target(
             name: "ModalDictationCore",
             dependencies: [
+                .product(name: "FluidAudio", package: "FluidAudio"),
                 .product(name: "TOMLKit", package: "TOMLKit"),
             ],
             path: "Sources/ModalDictationCore",
@@ -25,7 +26,6 @@ let package = Package(
             name: "ModalDictation",
             dependencies: [
                 "ModalDictationCore",
-                .product(name: "FluidAudio", package: "FluidAudio"),
             ],
             path: "Sources/ModalDictation"
         ),
