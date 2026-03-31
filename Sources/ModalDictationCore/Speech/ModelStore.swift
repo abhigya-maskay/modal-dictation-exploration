@@ -45,43 +45,46 @@ public actor ModelStore {
         _ = try await (tdt, eou, ctc)
     }
 
-    private func load<T>(
-        _ slot: WritableKeyPath<ModelStore, ModelSlot<T>>,
-        download: () async throws -> T
-    ) async throws -> T {
-        if let existing = self[keyPath: slot].value { return existing }
-
-        self[keyPath: slot].state = .loading
+    @discardableResult
+    public func loadTDT() async throws -> AsrModels {
+        if let existing = tdt.value { return existing }
+        tdt.state = .loading
         do {
-            let value = try await download()
-            self[keyPath: slot] = ModelSlot(value: value, state: .ready)
+            let value = try await AsrModels.downloadAndLoad(progressHandler: progressHandler)
+            tdt = ModelSlot(value: value, state: .ready)
             return value
         } catch {
-            self[keyPath: slot].state = .failed(error)
+            tdt.state = .failed(error)
             throw error
         }
     }
 
     @discardableResult
-    public func loadTDT() async throws -> AsrModels {
-        try await load(\.tdt) {
-            try await AsrModels.downloadAndLoad(progressHandler: progressHandler)
-        }
-    }
-
-    @discardableResult
     public func loadEOU() async throws -> StreamingEouAsrManager {
-        try await load(\.eou) {
+        if let existing = eou.value { return existing }
+        eou.state = .loading
+        do {
             let manager = StreamingEouAsrManager(chunkSize: chunkSize)
             try await manager.loadModelsFromHuggingFace(progressHandler: progressHandler)
+            eou = ModelSlot(value: manager, state: .ready)
             return manager
+        } catch {
+            eou.state = .failed(error)
+            throw error
         }
     }
 
     @discardableResult
     public func loadCTC() async throws -> CtcModels {
-        try await load(\.ctc) {
-            try await CtcModels.downloadAndLoad()
+        if let existing = ctc.value { return existing }
+        ctc.state = .loading
+        do {
+            let value = try await CtcModels.downloadAndLoad()
+            ctc = ModelSlot(value: value, state: .ready)
+            return value
+        } catch {
+            ctc.state = .failed(error)
+            throw error
         }
     }
 
