@@ -14,23 +14,9 @@ public protocol StreamingTranscriber: Sendable {
 
 public protocol ModelProviding: Sendable {
     func loadAll() async throws
-    func makeBatchTranscriber() async throws -> any BatchTranscriber
-    func getEOUManager() async throws -> StreamingEouAsrManager
+    func makeBatchTranscriber(
+        commandsConfig: CommandsConfig?
+    ) async throws -> any BatchTranscriber
+    func getEOUManager() async throws -> any StreamingTranscriber
 }
 
-extension ModelStore: ModelProviding {
-    public func makeBatchTranscriber() async throws -> any BatchTranscriber {
-        let models = try getTDTModels()
-        let manager = AsrManager()
-        try await manager.initialize(models: models)
-        return manager
-    }
-}
-
-extension AsrManager: BatchTranscriber {
-    public func transcribe(_ audioSamples: [Float]) async throws -> ASRResult {
-        try await self.transcribe(audioSamples, source: .microphone)
-    }
-}
-
-extension StreamingEouAsrManager: StreamingTranscriber {}

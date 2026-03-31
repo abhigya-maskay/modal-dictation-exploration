@@ -2,23 +2,29 @@
 import FluidAudio
 
 public enum SpeechRecognizerError: Error {
-    case notInitialized
     case alreadyActive(String)
 }
 
 public actor SpeechRecognizer {
 
-    public enum Mode: Sendable {
+    public enum Mode: Sendable, CustomStringConvertible {
         case idle
         case dictation
         case command
+
+        public var description: String {
+            switch self {
+            case .idle: "idle"
+            case .dictation: "dictation"
+            case .command: "command"
+            }
+        }
     }
 
     private let modelStore: any ModelProviding
     public private(set) var mode: Mode = .idle
 
-    private var dictationRecognizer: DictationRecognizer?
-    private var commandRecognizer: CommandRecognizer?
+    private var hybridRecognizer: HybridRecognizer?
 
     public init(modelStore: any ModelProviding) {
         self.modelStore = modelStore
@@ -29,47 +35,39 @@ public actor SpeechRecognizer {
     }
 
     public func startDictation(
-        audio: sending AsyncStream<AVAudioPCMBuffer>,
-        timeout: Double = 0.3
+        audio: sending AsyncStream<AVAudioPCMBuffer>
     ) async throws -> AsyncStream<ASRResult> {
-        guard mode == .idle else {
-            throw SpeechRecognizerError.alreadyActive("Cannot start dictation while \(mode) is active")
-        }
-
-        let transcriber = try await modelStore.makeBatchTranscriber()
-        let recognizer = DictationRecognizer(transcriber: transcriber, silenceTimeout: timeout)
-        dictationRecognizer = recognizer
-        mode = .dictation
-
-        return await recognizer.start(audio: audio)
+        try await start(audio: audio, mode: .dictation, commandsConfig: nil)
     }
 
     public func startCommands(
-        audio: sending AsyncStream<AVAudioPCMBuffer>
-    ) async throws -> AsyncStream<String> {
-        guard mode == .idle else {
-            throw SpeechRecognizerError.alreadyActive("Cannot start commands while \(mode) is active")
+        audio: sending AsyncStream<AVAudioPCMBuffer>,
+        commandsConfig: CommandsConfig
+    ) async throws -> AsyncStream<ASRResult> {
+        try await start(audio: audio, mode: .command, commandsConfig: commandsConfig)
+    }
+
+    private func start(
+        audio: sending AsyncStream<AVAudioPCMBuffer>,
+        mode: Mode,
+        commandsConfig: CommandsConfig?
+    ) async throws -> AsyncStream<ASRResult> {
+        guard self.mode == .idle else {
+            throw SpeechRecognizerError.alreadyActive("Cannot start \(mode) while \(self.mode) is active")
         }
 
-        let eouManager = try await modelStore.getEOUManager()
-        let recognizer = CommandRecognizer(streamingTranscriber: eouManager)
-        commandRecognizer = recognizer
-        mode = .command
+        let streaming = try await modelStore.getEOUManager()
+        let batch = try await modelStore.makeBatchTranscriber(commandsConfig: commandsConfig)
+        let recognizer = HybridRecognizer(streamingTranscriber: streaming, batchTranscriber: batch)
+        hybridRecognizer = recognizer
+        self.mode = mode
 
         return await recognizer.start(audio: audio)
     }
 
     public func stop() async {
-        switch mode {
-        case .dictation:
-            await dictationRecognizer?.stop()
-            dictationRecognizer = nil
-        case .command:
-            await commandRecognizer?.stop()
-            commandRecognizer = nil
-        case .idle:
-            break
-        }
+        await hybridRecognizer?.stop()
+        hybridRecognizer = nil
         mode = .idle
     }
 }

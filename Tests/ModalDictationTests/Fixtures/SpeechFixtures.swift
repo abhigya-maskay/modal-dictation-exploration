@@ -23,7 +23,20 @@ final class MockStreamingTranscriber: StreamingTranscriber, @unchecked Sendable 
     private(set) var finishCalls: Int = 0
     private(set) var resetCalls: Int = 0
 
-    func process(audioBuffer: AVAudioPCMBuffer) async throws -> String { processCalls += 1; return "" }
+    let processedStream: AsyncStream<Void>
+    private let processedContinuation: AsyncStream<Void>.Continuation
+
+    init() {
+        let (stream, continuation) = AsyncStream.makeStream(of: Void.self)
+        processedStream = stream
+        processedContinuation = continuation
+    }
+
+    func process(audioBuffer: AVAudioPCMBuffer) async throws -> String {
+        processCalls += 1
+        processedContinuation.yield()
+        return ""
+    }
     func finish() async throws -> String { finishCalls += 1; return finishResult }
     func reset() async { resetCalls += 1 }
     func setEouCallback(_ callback: @escaping @Sendable (String) -> Void) async { eouCallback = callback }
@@ -44,19 +57,28 @@ actor MockModelProvider: ModelProviding {
 
     func setBatchTranscriber(_ transcriber: any BatchTranscriber) { batchTranscriber = transcriber }
 
-    func makeBatchTranscriber() async throws -> any BatchTranscriber {
+    func makeBatchTranscriber(
+        commandsConfig: CommandsConfig? = nil
+    ) async throws -> any BatchTranscriber {
         guard let batchTranscriber else { throw ModelStoreError.modelsNotLoaded("mock transcriber not set") }
         return batchTranscriber
     }
 
-    private var eouManager: StreamingEouAsrManager?
+    private var eouManager: (any StreamingTranscriber)?
 
-    func setEOUManager(_ manager: StreamingEouAsrManager) { eouManager = manager }
+    func setEOUManager(_ manager: any StreamingTranscriber) { eouManager = manager }
 
-    func getEOUManager() async throws -> StreamingEouAsrManager {
+    func getEOUManager() async throws -> any StreamingTranscriber {
         guard let eouManager else { throw ModelStoreError.modelsNotLoaded("mock EOU not loaded") }
         return eouManager
     }
+}
+
+func makeSpeechRecognizer() async -> (SpeechRecognizer, MockModelProvider) {
+    let provider = MockModelProvider()
+    await provider.setEOUManager(MockStreamingTranscriber())
+    await provider.setBatchTranscriber(MockBatchTranscriber())
+    return (SpeechRecognizer(modelStore: provider), provider)
 }
 
 func makeBuffer(sampleCount: Int, amplitude: Float = 0.0) -> AVAudioPCMBuffer {
