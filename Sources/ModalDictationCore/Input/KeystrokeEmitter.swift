@@ -1,4 +1,3 @@
-import ApplicationServices
 import CoreGraphics
 
 public enum EmitterError: Error, Equatable {
@@ -32,13 +31,6 @@ public enum KeystrokeEmitter {
             keyDown.post(tap: .cghidEventTap)
             keyUp.post(tap: .cghidEventTap)
         }
-    }
-
-    @discardableResult
-    public static func ensureAccessibility() -> Bool {
-        let key = "AXTrustedCheckOptionPrompt" as CFString
-        let options = [key: true] as CFDictionary
-        return AXIsProcessTrustedWithOptions(options)
     }
 
     public static func emit(command: MatchedCommand) throws {
