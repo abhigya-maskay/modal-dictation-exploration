@@ -21,15 +21,7 @@ public enum KeystrokeEmitter {
         }
 
         for _ in 0..<count {
-            guard let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: mapping.keyCode, keyDown: true),
-                  let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: mapping.keyCode, keyDown: false)
-            else { continue }
-
-            keyDown.flags = flags
-            keyUp.flags = flags
-
-            keyDown.post(tap: .cghidEventTap)
-            keyUp.post(tap: .cghidEventTap)
+            try KeyEventPoster.post(keyCode: mapping.keyCode, flags: flags)
         }
     }
 
