@@ -3,11 +3,11 @@ public enum HotkeyRole: Sendable, Equatable {
     case sleepToggle
 }
 
-public enum VoiceTrigger: Sendable, Equatable {
-    case sleep
-    case wakeUp
-    case dictationMode
-    case commandMode
+public enum VoiceTrigger: String, Sendable, Equatable, CaseIterable {
+    case sleep = "app:sleep"
+    case wakeUp = "app:wake"
+    case dictationMode = "mode:dictation"
+    case commandMode = "mode:command"
 }
 
 public enum ModeEvent: Sendable, Equatable {

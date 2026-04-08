@@ -17,12 +17,7 @@ Task {
         let deviceUID = config.mic.deviceID
 
         print("Starting \(Int(durationSeconds))s audio capture...")
-        try await engine.start(deviceUID: deviceUID)
-
-        guard let stream = await engine.bufferStream else {
-            print("No buffer stream available")
-            exit(1)
-        }
+        let stream = try await engine.start(deviceUID: deviceUID)
 
         let converter = AudioConverter()
         var allSamples: [Float] = []

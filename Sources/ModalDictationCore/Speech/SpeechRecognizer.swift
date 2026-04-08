@@ -5,7 +5,7 @@ public enum SpeechRecognizerError: Error {
     case alreadyActive(String)
 }
 
-public actor SpeechRecognizer {
+public actor SpeechRecognizer: SpeechRecognizing {
 
     public enum Mode: Sendable, CustomStringConvertible {
         case idle

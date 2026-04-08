@@ -34,3 +34,11 @@ public enum KeystrokeEmitter {
         }
     }
 }
+
+public struct LiveKeystrokeEmitter: KeystrokeEmitting {
+    public init() {}
+
+    public func emit(command: MatchedCommand) throws {
+        try KeystrokeEmitter.emit(command: command)
+    }
+}

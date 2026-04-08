@@ -8,22 +8,6 @@ public enum ListenerError: Error, Equatable {
     case hidManagerOpenFailed
 }
 
-public enum HotkeyAction: Sendable, Equatable {
-    case press
-    case release
-}
-
-public struct HotkeyEvent: Sendable, Equatable {
-    public let action: HotkeyAction
-    public let input: HotkeyInput
-}
-
-@MainActor
-public protocol HotkeyListening: Sendable {
-    func start(config: HotkeyConfig) throws -> AsyncStream<HotkeyEvent>
-    func stop()
-}
-
 @MainActor
 public final class HotkeyListener: HotkeyListening {
 

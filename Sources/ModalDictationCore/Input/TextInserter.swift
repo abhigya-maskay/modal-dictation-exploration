@@ -6,17 +6,6 @@ public enum InserterError: Error, Equatable {
     case pasteboardWriteFailed
 }
 
-public protocol PasteStrategy {
-    func paste() throws
-}
-
-public struct CGEventPasteStrategy: PasteStrategy {
-    public init() {}
-    public func paste() throws {
-        try KeyEventPoster.post(keyCode: CGKeyCode(kVK_ANSI_V), flags: .maskCommand)
-    }
-}
-
 public enum TextInserter {
 
     public static func insert(
@@ -35,6 +24,21 @@ public enum TextInserter {
 
         try pasteStrategy.paste()
         try await Task.sleep(for: settleDelay)
+    }
+}
+
+public struct CGEventPasteStrategy: PasteStrategy {
+    public init() {}
+    public func paste() throws {
+        try KeyEventPoster.post(keyCode: CGKeyCode(kVK_ANSI_V), flags: .maskCommand)
+    }
+}
+
+public struct PasteboardTextInserter: TextInserting {
+    public init() {}
+
+    public func insert(_ text: String) async throws {
+        try await TextInserter.insert(text)
     }
 }
 

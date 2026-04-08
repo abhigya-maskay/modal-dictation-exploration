@@ -9,11 +9,6 @@ public enum PermissionStatus: Sendable, Equatable {
     case restricted
 }
 
-@MainActor
-public protocol AccessibilityChecker {
-    func isProcessTrusted() -> Bool
-}
-
 public struct SystemAccessibilityChecker: AccessibilityChecker {
     public init() {}
     public func isProcessTrusted() -> Bool { AXIsProcessTrusted() }

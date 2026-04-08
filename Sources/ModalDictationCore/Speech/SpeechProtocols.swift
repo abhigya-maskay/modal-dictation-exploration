@@ -12,6 +12,17 @@ public protocol StreamingTranscriber: Sendable {
     func setEouCallback(_ callback: @escaping @Sendable (String) -> Void) async
 }
 
+public protocol SpeechRecognizing: Sendable {
+    func startDictation(
+        audio: sending AsyncStream<AVAudioPCMBuffer>
+    ) async throws -> AsyncStream<ASRResult>
+    func startCommands(
+        audio: sending AsyncStream<AVAudioPCMBuffer>,
+        commandsConfig: CommandsConfig
+    ) async throws -> AsyncStream<ASRResult>
+    func stop() async
+}
+
 public protocol ModelProviding: Sendable {
     func loadAll() async throws
     func makeBatchTranscriber(
@@ -19,4 +30,3 @@ public protocol ModelProviding: Sendable {
     ) async throws -> any BatchTranscriber
     func getEOUManager() async throws -> any StreamingTranscriber
 }
-
